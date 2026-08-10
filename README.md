@@ -35,19 +35,4 @@
 
 ## ライセンス
 
-MIT License。改変・再配布は自由です。自分の前提に置き換えて回してみてもらえると、この模型の使い道としては一番いい。
-
-## 公開手順
-
-### GitHub Pages（推奨・URLが安定し版管理も残る）
-
-1. GitHubで公開リポジトリを新規作成
-2. `index.html` と `README.md` をアップロード
-3. Settings → Pages → Source を「Deploy from a branch」、Branch を `main` / `(root)` にして Save
-4. 数分で `https://<ユーザー名>.github.io/<リポジトリ名>/` で公開される
-
-### Netlify Drop（最速・アカウント不要で試せる）
-
-1. https://app.netlify.com/drop を開く
-2. このフォルダごとドラッグ＆ドロップ
-3. 即座にURLが発行される（永続化と独自ドメインはアカウント登録後）
+MIT License。改変・再配布は自由です。自分の前提に置き換えて回してみてください。
