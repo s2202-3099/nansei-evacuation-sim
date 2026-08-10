@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="description" content="南西諸島（先島諸島）の住民避難を、航空機・船舶・ヘリのアセット数から輸送力を積み上げて日次で解くシミュレータ。モンテカルロと感度分析を内蔵。図上検討用の非公式モデル。">
+<meta name="author" content="">
+<meta property="og:type" content="website">
+<meta property="og:title" content="南西諸島 住民避難シミュレータ">
+<meta property="og:description" content="先島諸島18島・住民112,335人の島外避難を輸送力から解く。空港スロット、母港からの回転日数、部隊展開との競合、受入側の収容力を組み込んだ図上検討用モデル。">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="robots" content="index, follow">
+
+<title>南西諸島 住民避難シミュレータ v3</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{color-scheme:light only;
+--paper:#F6F1E4;--paper-2:#EDE5D2;--sea:#C9DFE8;--ink:#17242F;--ink-2:#4A5A66;
+--rule:#B9AC90;--magenta:#96256B;--orange:#C05A24;--teal:#1F6E7B;--warn:#B3341F;--ok:#3F7A4B;--violet:#5B4A87}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;background:#F6F1E4;color:#17242F}
+#shell,header,#panel,#timebar{background:var(--paper);color:var(--ink)}
+.sect,.ctrl,.note,.pipe-row,.tor{color:var(--ink)}
+table.tt{background:var(--paper)}
+button,input,select,textarea{color:var(--ink)}
+body{background:var(--paper);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",-apple-system,"Segoe UI",sans-serif;font-size:13px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+#shell{display:flex;flex-direction:column;height:100%}
+header{border-bottom:1px solid var(--rule);background:var(--paper);padding:9px 14px 7px;display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
+header h1{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:16.5px;font-weight:600;margin:0;letter-spacing:.06em}
+header .sub{font-size:10.5px;color:var(--ink-2)}
+.badge{font-size:9.5px;letter-spacing:.12em;padding:2px 7px;border:1px solid var(--magenta);color:var(--magenta);border-radius:2px}
+#main{flex:1;display:flex;min-height:0}
+#mapwrap{flex:1;position:relative;min-width:0;background:var(--sea)}
+#map{position:absolute;inset:0}
+#panel{width:368px;flex:none;border-left:1px solid var(--rule);overflow-y:auto;padding:12px 14px 40px;background:var(--paper)}
+@media (max-width:880px){#main{flex-direction:column}#mapwrap{height:40vh;flex:none}
+#panel{width:auto;border-left:none;border-top:1px solid var(--rule);flex:1}}
+.leaflet-tile-pane{filter:sepia(.42) saturate(.72) hue-rotate(-6deg) brightness(1.04) contrast(.94)}
+.leaflet-container{background:var(--sea);font-family:inherit}
+.leaflet-control-attribution{font-size:9px;background:rgba(246,241,228,.82)}
+.sect{margin:0 0 16px}
+.sect-h{font-size:10px;letter-spacing:.18em;color:var(--ink-2);border-bottom:1px solid var(--rule);
+padding-bottom:3px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:baseline}
+.sect-h em{font-style:normal;font-size:9.5px;letter-spacing:.05em;color:var(--magenta)}
+.ctrl{margin-bottom:11px}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:2px}
+.ctrl-label{font-size:11.5px}.ctrl-val{font-size:12px;font-weight:600;color:var(--magenta)}
+input[type=range]{width:100%;height:18px;-webkit-appearance:none;background:transparent;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--rule)}
+input[type=range]::-moz-range-track{height:2px;background:var(--rule)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-6px;border-radius:50%;background:var(--paper);border:2px solid var(--magenta)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--paper);border:2px solid var(--magenta)}
+input[type=range]:focus-visible{outline:2px solid var(--teal);outline-offset:3px}
+.hint{font-size:10px;color:var(--ink-2);margin-top:1px}
+.seg{display:flex;border:1px solid var(--rule);margin-top:3px}
+.seg button{flex:1;font-family:inherit;font-size:11px;padding:6px 4px;background:transparent;border:none;color:var(--ink-2);cursor:pointer;border-right:1px solid var(--rule)}
+.seg button:last-child{border-right:none}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.kpi{background:var(--paper);padding:7px 9px}
+.kpi .k{font-size:9.5px;letter-spacing:.09em;color:var(--ink-2)}
+.kpi .v{font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.28}
+.kpi .v small{font-size:11px;font-weight:400;letter-spacing:0}
+.kpi.alert .v{color:var(--warn)}.kpi.good .v{color:var(--ok)}
+.bnk{border:1px solid var(--rule);padding:7px 9px;margin-top:8px;background:var(--paper-2)}
+.bnk .t{font-size:9.5px;letter-spacing:.09em;color:var(--ink-2)}
+.bnk .b{font-size:14px;font-weight:600;color:var(--warn)}
+.bnk .d{font-size:10.5px;color:var(--ink-2);margin-top:2px;line-height:1.55}
+.tt{width:100%;border-collapse:collapse;font-size:10.5px}
+.tt th{text-align:left;font-weight:400;color:var(--ink-2);font-size:9.5px;letter-spacing:.08em;border-bottom:1px solid var(--rule);padding:2px 0}
+.tt td{padding:2.5px 0;border-bottom:1px dotted var(--rule)}
+.tt td:last-child,.tt th:last-child{text-align:right}
+.tt td.bind{color:var(--warn);font-weight:600}
+.tt tr.sub td{color:var(--ink-2);padding-left:8px}
+.tt tr.hd td{font-weight:600;border-bottom:1px solid var(--rule)}
+.pipe-row{display:grid;grid-template-columns:76px 1fr 58px;gap:7px;align-items:center;margin-bottom:4px}
+.pipe-name{font-size:10.5px;text-align:right;color:var(--ink-2);line-height:1.25}
+.bar{height:12px;background:var(--paper-2);position:relative;overflow:hidden;border:1px solid var(--rule)}
+.bar i{position:absolute;left:0;top:0;bottom:0;display:block;transition:width .18s linear}
+.bar i.done{background:var(--teal);opacity:.3}
+.bar i.queue{background:repeating-linear-gradient(-45deg,var(--orange),var(--orange) 3px,transparent 3px,transparent 6px)}
+.bar i.naha{background:repeating-linear-gradient(-45deg,var(--violet),var(--violet) 3px,transparent 3px,transparent 6px)}
+.bar i.dep{background:repeating-linear-gradient(45deg,#17242F,#17242F 3px,transparent 3px,transparent 6px)}
+.pipe-num{font-size:10.5px;text-align:right}
+#timebar{border-top:1px solid var(--rule);background:var(--paper);padding:7px 14px 9px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+#play{width:32px;height:32px;flex:none;border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:50%;cursor:pointer;font-size:12px;display:grid;place-items:center}
+#dayreadout{flex:none;min-width:110px}
+#dayreadout .d{font-size:19px;font-weight:600}
+#dayreadout .l{font-size:9.5px;letter-spacing:.1em;color:var(--ink-2)}
+#daySlider{flex:1;min-width:140px}
+.mlegend{position:absolute;left:9px;bottom:9px;z-index:500;background:rgba(246,241,228,.93);border:1px solid var(--rule);padding:6px 8px;font-size:9.5px;line-height:1.5;pointer-events:none}
+.mlegend b{font-weight:600;letter-spacing:.1em;font-size:9px;color:var(--ink-2);display:block;margin-bottom:2px}
+.sw{display:inline-block;width:9px;height:9px;vertical-align:-1px;margin-right:4px;border:1px solid rgba(0,0,0,.25)}
+#views{position:absolute;right:9px;top:9px;z-index:500;display:flex;gap:4px}
+#views button{font-size:10px;padding:4px 8px;border:1px solid var(--rule);background:rgba(246,241,228,.93);color:var(--ink);cursor:pointer;font-family:inherit;border-radius:2px}
+#tilewarn{position:absolute;left:9px;top:9px;z-index:500;background:var(--warn);color:#fff;font-size:10px;padding:4px 8px;display:none;max-width:70%}
+.leaflet-tooltip.lab{background:rgba(246,241,228,.9);border:1px solid var(--rule);color:var(--ink);font-size:10px;padding:1px 4px;box-shadow:none;font-family:inherit}
+.leaflet-tooltip.lab::before{display:none}
+.leaflet-popup-content-wrapper{border-radius:2px;background:var(--paper);border:1px solid var(--rule)}
+.leaflet-popup-content{margin:9px 11px;font-size:11.5px}.leaflet-popup-tip{background:var(--paper)}
+.pp-t{font-weight:600;font-size:12.5px;margin-bottom:3px}
+.pp-r{display:flex;justify-content:space-between;gap:14px;border-bottom:1px dotted var(--rule);padding:1px 0}
+.note{font-size:10px;color:var(--ink-2);line-height:1.62;margin-top:8px}
+.note b{color:var(--ink);font-weight:600}
+.mcbtn{width:100%;font-family:inherit;font-size:11.5px;padding:7px;background:var(--ink);
+color:var(--paper);border:none;border-radius:2px;cursor:pointer;letter-spacing:.06em}
+.mcbtn:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.tor{display:grid;grid-template-columns:82px 1fr 46px;gap:6px;align-items:center;margin-bottom:3px}
+.tor .l{font-size:10.5px;text-align:right;color:var(--ink-2)}
+.tor .t{height:13px;position:relative;background:var(--paper-2);border:1px solid var(--rule)}
+.tor .t i{position:absolute;top:0;bottom:0;display:block}
+.tor .t .mid{position:absolute;top:0;bottom:0;width:1px;background:var(--rule);left:50%}
+.tor .v{font-size:10.5px;text-align:right}
+.flow{stroke-dasharray:5 7;animation:dash 1.1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-24}}
+@media (prefers-reduced-motion:reduce){.flow{animation:none}}
+</style>
+</head>
+<body>
+<div id="shell">
+  <header>
+    <h1>南西諸島 住民避難シミュレータ</h1>
+    <span class="sub">母港運用・展開結合モデル v3</span>
+    <span class="badge">図上検討用・非公式</span>
+  </header>
+  <div id="main">
+    <div id="mapwrap">
+      <div id="map"></div>
+      <div id="tilewarn">地図タイルを読み込めません。位置関係のみ表示しています。</div>
+      <div id="views"><button data-v="saki">先島</button><button data-v="all">全域</button><button data-v="jp">母港</button><button id="tileBtn">地図タイル</button></div>
+      <div class="mlegend"><b>凡例</b>
+        <span class="sw" style="background:#96256B"></span>未搬出の島<br>
+        <span class="sw" style="background:#1F6E7B"></span>搬出完了<br>
+        <span class="sw" style="background:#5B4A87"></span>那覇の滞留<br>
+        <span class="sw" style="background:#17242F"></span>母港（進出元）<br><span class="sw" style="background:#E9DDC2;border-color:#8C7F63"></span>陸地（内蔵海岸線）<br>
+        <span class="sw" style="background:#C05A24"></span>使用する受入空港<br>
+        <span style="display:inline-block;width:9px;border-top:2px solid #5B4A87;vertical-align:3px;margin-right:4px"></span>沖縄経由
+      </div>
+    </div>
+    <div id="panel">
+
+      <div class="sect">
+        <div class="sect-h"><span>結果</span><em id="verdict"></em></div>
+        <div class="kpis">
+          <div class="kpi" id="kSaki"><div class="k">先島の搬出完了</div><div class="v">–</div></div>
+          <div class="kpi" id="kAll"><div class="k">本土到達まで</div><div class="v">–</div></div>
+          <div class="kpi" id="kSub"><div class="k">–</div><div class="v">–</div></div>
+          <div class="kpi" id="kDep"><div class="k">即機連5個の展開完了</div><div class="v">–</div></div>
+          <div class="kpi" id="kAtWar"><div class="k">攻撃開始時の残留</div><div class="v">–</div></div>
+          <div class="kpi" id="kEff"><div class="k">実効輸送力</div><div class="v">–</div></div>
+          <div class="kpi" id="kSelf"><div class="k">観光客の自力退避</div><div class="v">–</div></div>
+          <div class="kpi" id="kRes"><div class="k">要収容（住民のみ）</div><div class="v">–</div></div>
+        </div>
+        <div class="bnk"><div class="t">律速要因</div><div class="b" id="bn">–</div><div class="d" id="bnd"></div></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h"><span>変動パラメータ</span></div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">観光の繁閑（ピーク係数）</span><span class="ctrl-val" id="vPeak"></span></div>
+          <input type="range" id="sPeak" min="40" max="250" step="5" value="100">
+          <div class="hint" id="peakHint"></div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">使用可能な民間飛行機</span><span class="ctrl-val" id="vPln"></span></div>
+          <input type="range" id="sPln" min="0" max="90" step="1" value="51">
+          <div class="hint">2割を離島コミューター、8割を拠点島発の幹線便に充てる。</div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">使用可能な民間ヘリコプター</span><span class="ctrl-val" id="vHeli"></span></div>
+          <input type="range" id="sHeli" min="0" max="60" step="1" value="8">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">民間船舶の徴用率</span><span class="ctrl-val" id="vShip"></span></div>
+          <input type="range" id="sShip" min="0" max="70" step="1" value="35">
+          <div class="hint">500名超級の長距離フェリー等 約30隻に対する比率。船員は非戦闘員であり、全船徴用は前提から外してある。</div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">他方面からの割当率</span><span class="ctrl-val" id="vAlloc"></span></div>
+          <input type="range" id="sAlloc" min="0" max="100" step="5" value="50">
+          <div class="hint">呉・横須賀・舞鶴および他管区の資産をどこまで南西へ集中させるか。西部方面・第十・第十一管区の資産は常時100%。</div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">一時受け入れ先</span></div>
+          <div class="seg" id="segDest">
+            <button data-d="kagoshima" aria-pressed="true">鹿児島</button>
+            <button data-d="fukuoka" aria-pressed="false">福岡</button>
+            <button data-d="kyushu" aria-pressed="false">九州･山口</button>
+          </div>
+          <div class="seg" id="segDest2" style="border-top:none">
+            <button data-d="chushikoku" aria-pressed="false">＋中国四国</button>
+            <button data-d="kansai" aria-pressed="false">＋関西</button>
+            <button data-d="national" aria-pressed="false">全国分散</button>
+          </div>
+          <div class="hint" id="destHint"></div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">観光客の自力退避</span><span class="ctrl-val" id="vSelf"></span></div>
+          <input type="range" id="sSelf" min="0" max="100" step="5" value="60">
+          <div class="hint">公示前の定期便で自力で帰る観光客の割合。石垣5,261席・宮古3,958席という平時の座席数が上限になる。</div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">住民の自主避難</span><span class="ctrl-val" id="vSelfR"></span></div>
+          <input type="range" id="sSelfR" min="0" max="40" step="1" value="8">
+          <div class="hint">公示前に縁故を頼って自力で島を出る住民の割合。公的な受入枠を消費しない。ウクライナでは数か月の明示的警告があっても事前避難は全人口の1%未満だった。</div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">沖縄本島を経由させる比率</span><span class="ctrl-val" id="vVia"></span></div>
+          <input type="range" id="sVia" min="0" max="100" step="1" value="0">
+          <div class="hint">残りは先島から九州へ直行する。経由分は那覇で降ろし、二次輸送で本土へ送る。</div>
+          </div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h"><span>時間の前提</span><em>ここが本丸</em></div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">決心から避難開始まで</span><span class="ctrl-val" id="vStart"></span></div>
+          <input type="range" id="sStart" min="0" max="21" step="1" value="3">
+          <div class="hint">武力攻撃予測事態の認定、避難措置の指示、避難実施要領の策定、住民への周知と集合。輸送力の問題ではない部分。</div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">攻撃開始までの猶予</span><span class="ctrl-val" id="vWarn"></span></div>
+          <input type="range" id="sWarn" min="0" max="40" step="1" value="10">
+          <div class="hint">決心の日から数える。これを過ぎると輸送力が下の割合まで落ちる。</div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top"><span class="ctrl-label">攻撃開始後の輸送力低下</span><span class="ctrl-val" id="vDis"></span></div>
+          <input type="range" id="sDis" min="0" max="100" step="5" value="60">
+          <div class="hint">空港・港湾の可用性低下、空域と海域の制限、民間事業者の運航中止をまとめた係数。</div>
+        </div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h"><span>モンテカルロ</span><em id="mcN"></em></div>
+        <button id="mcRun" class="mcbtn">1,200回まわす</button>
+        <div id="mcOut" style="display:none">
+          <svg id="mcHist" width="336" height="96" style="margin-top:8px"></svg>
+          <table class="tt" id="mcTable"><tbody></tbody></table>
+          <div class="note" id="mcNote"></div>
+          <div class="sect-h" style="margin-top:14px"><span>感度分析</span><em>成功確率への寄与</em></div>
+          <div id="tornado"></div>
+          <div class="note" id="sensNote"></div>
+        </div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h"><span>1日あたり輸送力</span><em id="capTotal"></em></div>
+        <table class="tt" id="capTable"><tbody></tbody></table>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h"><span>進捗</span><em id="dayEcho"></em></div>
+        <div id="pipe"></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h"><span>固定条件</span></div>
+        <table class="tt" id="fixTable"><tbody></tbody></table>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h"><span>この模型の前提</span></div>
+        <div class="note">
+          <b>母港運用</b>：前進配置は行わない。母港から先島までの往復サイクルは那覇1.5日、鹿児島3日、佐世保3.5日、呉4日、横須賀5.5日、その他本州5日。受け入れ先を沖縄本島とした場合は往復距離が縮むため各サイクルに0.62を乗じる。各艦は片道所要日数が経過して初めて避難輸送に寄与しはじめる。<br><br>
+          <b>展開との結合</b>：即応機動連隊5個（人員約6,000名・車両約1,000両）の往路輸送を先に処理する。往路で先島に到達した船腹は、翌日から復路として避難民を運ぶ。車両甲板を旅客に転用できるため復路は往路の1.6倍を積む。<br><br>
+          <b>観光客の扱い</b>：観光客は本土に自宅があるため、長期の受入枠を消費しない。運ぶ必要はあるが、着いた先で必要なのは乗継までの1〜2泊だけである。また事態が緊迫すれば公示を待たず定期便で自力退避する。この2点を住民と分けて計算している。<br><br>
+          <b>算入しないもの</b>：尖閣領海警備専従部隊のPL10隻。護衛艦・掃海艇の輸送力（護衛と航路啓開が本務）。海保固定翼機（洋上監視機で客席がない）。陸自の戦闘部隊人員（南西展開が優先され避難支援に回らない）。<br><br>
+          <b>出所と推定</b>：輸送力の較正は内閣官房国家危機管理室「沖縄県の離島からの住民避難・受入れに係る取組」（令和8年3月）。部隊編成は公表資料による。座席数・ソーティ数・回転日数・収容人員・可動率は機種と距離から置いた推定値であり、公表されたものではない。
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="timebar">
+    <button id="play" aria-label="再生／停止">▶</button>
+    <div id="dayreadout"><div class="d mono" id="dayNum">0日目</div><div class="l" id="dayPct">避難開始前</div></div>
+    <input type="range" id="daySlider" min="0" max="30" step="1" value="0">
+    <svg id="spark" width="150" height="34" aria-hidden="true"></svg>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ===== 島（先島・有人14島） ===== */
+// lam＝1日あたり入域者、stay＝平均在島日数。滞在者ストック＝lam×stay
+const ISLANDS=[
+ {id:'ishigaki',n:'石垣島',pop:49821,lat:24.3450,lng:124.1570,type:'hub',hub:'ISG',berth:0,lam:2493,stay:3.0},
+ {id:'miyako',n:'宮古島',pop:50133,lat:24.7900,lng:125.3110,type:'hub',hub:'MYK',berth:0,lam:2750,stay:2.8},
+ {id:'irabu',n:'伊良部島',pop:4800,lat:24.8220,lng:125.1850,type:'bridge',hub:'MYK',berth:0,lam:600,stay:1.2},
+ {id:'shimoji',n:'下地島',pop:50,lat:24.8270,lng:125.1450,type:'bridge',hub:'MYK',berth:0,lam:900,stay:0.20},
+ {id:'ikema',n:'池間島',pop:450,lat:24.9280,lng:125.2580,type:'bridge',hub:'MYK',berth:0,lam:500,stay:0.25},
+ {id:'kurima',n:'来間島',pop:130,lat:24.7320,lng:125.2590,type:'bridge',hub:'MYK',berth:0,lam:450,stay:0.30},
+ {id:'yonaguni',n:'与那国島',pop:1689,lat:24.4670,lng:122.9780,type:'strip',hub:'ISG',berth:400,lam:100,stay:2.5},
+ {id:'hateruma',n:'波照間島',pop:463,lat:24.0580,lng:123.7800,type:'strip',hub:'ISG',berth:250,lam:120,stay:1.5},
+ {id:'tarama',n:'多良間島',pop:1040,lat:24.6650,lng:124.7000,type:'strip',hub:'MYK',berth:600,lam:27,stay:2.0},
+ {id:'iriomote',n:'西表島',pop:2384,lat:24.2880,lng:123.8810,type:'heli',hub:'ISG',berth:900,lam:767,stay:1.6},
+ {id:'kohama',n:'小浜島',pop:705,lat:24.3430,lng:123.9800,type:'heli',hub:'ISG',berth:350,lam:350,stay:2.5},
+ {id:'taketomi',n:'竹富島',pop:351,lat:24.3310,lng:124.0930,type:'heli',hub:'ISG',berth:350,lam:1300,stay:0.35},
+ {id:'kuroshima',n:'黒島',pop:212,lat:24.2380,lng:124.0170,type:'heli',hub:'ISG',berth:150,lam:200,stay:0.40},
+ {id:'hatoma',n:'鳩間島',pop:58,lat:24.4700,lng:123.8220,type:'heli',hub:'ISG',berth:60,lam:40,stay:0.80},
+ {id:'aragusuku',n:'新城島',pop:11,lat:24.2320,lng:123.9450,type:'port',hub:'ISG',berth:30,lam:60,stay:0.20},
+ {id:'yubu',n:'由布島',pop:15,lat:24.3200,lng:123.8480,type:'port',hub:'ISG',berth:40,lam:300,stay:0.15},
+ {id:'ogami',n:'大神島',pop:20,lat:24.8920,lng:125.3180,type:'port',hub:'MYK',berth:50,lam:80,stay:0.20},
+ {id:'minna',n:'水納島',pop:3,lat:24.7770,lng:124.7000,type:'port',hub:'MYK',berth:20,lam:20,stay:0.20},
+];
+const HUBS={ISG:{n:'石垣島',lat:24.3960,lng:124.2450,port:[24.3360,124.1560],slots:55},
+            MYK:{n:'宮古島',lat:24.7828,lng:125.2950,port:[24.8080,125.2790],slots:70}};
+const NAHA={n:'那覇',lat:26.2000,lng:127.6560}, KAGO={n:'鹿児島',lat:31.8030,lng:130.7190};
+// 九州の受入空港。share は「九州分散」時の便数配分（合計140便）
+const KYUSHU_AP=[
+ {id:'fukuoka',  n:'福岡',  lat:33.5850,lng:130.4510,share:30},
+ {id:'kitakyushu',n:'北九州',lat:33.8450,lng:131.0350,share:15},
+ {id:'saga',     n:'佐賀',  lat:33.1500,lng:130.3020,share:8},
+ {id:'nagasaki', n:'長崎',  lat:32.9170,lng:129.9130,share:15},
+ {id:'kumamoto', n:'熊本',  lat:32.8370,lng:130.8550,share:20},
+ {id:'oita',     n:'大分',  lat:33.4800,lng:131.7370,share:12},
+ {id:'miyazaki', n:'宮崎',  lat:31.8770,lng:131.4490,share:15},
+ {id:'kagoshima',n:'鹿児島',lat:31.8030,lng:130.7190,share:25},
+ {id:'yamaguchi',n:'山口宇部',lat:33.9300,lng:131.2790,share:12},
+ {id:'hiroshima',n:'広島',  lat:34.4360,lng:132.9190,share:22},
+ {id:'okayama',  n:'岡山',  lat:34.7570,lng:133.8550,share:16},
+ {id:'matsuyama',n:'松山',  lat:33.8270,lng:132.7000,share:14},
+ {id:'takamatsu',n:'高松',  lat:34.2140,lng:134.0160,share:12},
+ {id:'izumo',    n:'出雲',  lat:35.4140,lng:132.8900,share:8},
+ {id:'tokushima',n:'徳島',  lat:34.1330,lng:134.6070,share:8},
+ {id:'kochi',    n:'高知',  lat:33.5460,lng:133.6690,share:10},
+ {id:'itami',    n:'伊丹',  lat:34.7850,lng:135.4380,share:30},
+ {id:'kansai',   n:'関西',  lat:34.4340,lng:135.2330,share:40},
+ {id:'kobe',     n:'神戸',  lat:34.6330,lng:135.2240,share:20},
+ {id:'chubu',    n:'中部',  lat:34.8580,lng:136.8050,share:35},
+ {id:'komatsu',  n:'小松',  lat:36.3940,lng:136.4070,share:12},
+ {id:'haneda',   n:'羽田',  lat:35.5490,lng:139.7800,share:45},
+ {id:'narita',   n:'成田',  lat:35.7650,lng:140.3860,share:40},
+ {id:'ibaraki',  n:'茨城',  lat:36.1810,lng:140.4150,share:15},
+];
+const PORTS=[{n:'佐世保',lat:33.1600,lng:129.7150},{n:'呉',lat:34.2400,lng:132.5550},
+             {n:'横須賀',lat:35.2880,lng:139.6700},{n:'舞鶴',lat:35.4750,lng:135.3830}];
+
+/* ===== 母港別の往復サイクル（日） ===== */
+const CYCLE={naha:1.5,kagoshima:3,sasebo:3.5,kure:4,yokosuka:5.5,honshu:5};
+// factor は先島からの往復距離比、slots は受入側が1日にさばける便数
+// dist＝先島からの平均距離km、slots＝受入側が1日にさばける便数、cap＝受入可能人数
+const DESTS={
+ kagoshima:{n:'鹿児島',    dist:1000,slots:50, cap:13800, aps:['kagoshima']},
+ fukuoka  :{n:'福岡',      dist:1100,slots:45, cap:47400, aps:['fukuoka']},
+ kyushu   :{n:'九州・山口',dist:1080,slots:140,cap:112800,
+   aps:['fukuoka','kitakyushu','saga','nagasaki','kumamoto','oita','miyazaki','kagoshima','yamaguchi']},
+ chushikoku:{n:'＋中国四国',dist:1330,slots:230,cap:190000,
+   aps:['fukuoka','kitakyushu','saga','nagasaki','kumamoto','oita','miyazaki','kagoshima','yamaguchi',
+        'hiroshima','okayama','matsuyama','takamatsu','izumo','tokushima','kochi']},
+ kansai   :{n:'＋関西',    dist:1420,slots:320,cap:310000,
+   aps:['fukuoka','kitakyushu','saga','nagasaki','kumamoto','oita','miyazaki','kagoshima','yamaguchi',
+        'hiroshima','okayama','matsuyama','takamatsu','izumo','tokushima','kochi',
+        'itami','kansai','kobe']},
+ national :{n:'全国分散',  dist:1550,slots:480,cap:600000,
+   aps:['fukuoka','kitakyushu','saga','nagasaki','kumamoto','oita','miyazaki','kagoshima','yamaguchi',
+        'hiroshima','okayama','matsuyama','takamatsu','izumo','tokushima','kochi',
+        'itami','kansai','kobe','chubu','komatsu','haneda','narita','ibaraki']},
+};
+const OKI={dist:410, slots:40};
+const ONWARD={slots:60, seat:200, sea:1500};
+// 往復回数＝12時間運用÷(往復飛行時間＋地上折返し1.5時間)。鹿児島で1.9便/機になるよう較正
+const sortieOf=d=>9.44/(2*(d/750+0.4)+1.5);
+// 船は距離にほぼ比例するが、港での積卸時間が下限を作る
+const seaFactorOf=d=>0.30+0.70*d/1000;
+// スポット数×1日の回転数で積む（回転＝降機・簡素清掃・搭乗で90分、12時間運用）
+const SPOTS={ishigaki:{spot:5,turn:8},miyako:{spot:4,turn:8},shimoji:{spot:3,turn:7}};
+const ORIGIN_SLOTS=Object.values(SPOTS).reduce((s,x)=>s+x.spot*x.turn,0); // = 93便
+const MIL_SLOTS={deploy:30,after:15};  // 展開・補給が食う便数
+const HELI_FOR_CIV={deploy:0.40,after:0.70}; // 官ヘリのうち住民輸送に回せる比率
+
+/* ===== 固定アセット ===== */
+// local:true は西部方面・第十・第十一管区（割当率の対象外）
+// cap＝通常の人員輸送定員、conv＝車両甲板等を旅客に転用したときの倍率
+// 甲板を持たない艦は conv=1。avail＝連続運用に耐える比率（乗員疲労・補給）
+const SEA=[
+ {n:'海保 第十一管区（尖閣専従を除く）',num:1,cap:2805,conv:1.0,avail:0.7,port:'naha',local:true},
+ {n:'海保 第十管区',                  num:1,cap:2890,conv:1.0,avail:0.7,port:'kagoshima',local:true},
+ {n:'DDH いせ',                       num:1,cap:450, conv:1.0,avail:0.8,port:'sasebo',local:true},
+ {n:'海自 佐世保 補助艦艇',            num:1,cap:200, conv:1.0,avail:0.7,port:'sasebo',local:true},
+ {n:'おおすみ型輸送艦',                num:2,cap:330, conv:1.6,avail:0.9,port:'kure'},
+ {n:'海上輸送群 LSV',                 num:1,cap:350, conv:1.6,avail:0.9,port:'kure'},
+ {n:'海上輸送群 LCU',                 num:2,cap:100, conv:1.6,avail:0.9,port:'kure'},
+ {n:'DDH いずも型・ひゅうが型',        num:2,cap:450, conv:1.0,avail:0.8,port:'yokosuka'},
+ {n:'掃海母艦・補給艦・練習艦',        num:4,cap:150, conv:1.0,avail:0.7,port:'kure'},
+ {n:'海保 他管区 PLH・PL',            num:12,cap:200,conv:1.0,avail:0.7,port:'honshu'},
+ {n:'PFI船 はくおう・ナッチャンWorld', num:2,cap:690, conv:1.4,avail:0.9,port:'honshu'},
+];
+const AIR=[  // 保有×可動率。C-2は保有約20機、C-130Hは約13機
+ {n:'C-2 輸送機',        num:12,seat:110,local:false},
+ {n:'C-130H 輸送機',     num:8, seat:90, local:false},
+ {n:'KC-767/46・政府専用機',num:4,seat:150,local:false},
+];
+const HELI=[
+ {n:'海保 回転翼（十・十一管）',num:18,seat:10,sortie:5,local:true},
+ {n:'西部方面航空隊',          num:12,seat:11,sortie:5,local:true},
+ {n:'CH-47J/JA',              num:33,seat:55,sortie:4,local:false},
+ {n:'UH-60JA・UH-2',          num:30,seat:12,sortie:5,local:false},
+];
+const STAFF={陸自:4500,海上保安庁:2000,警察:1000,消防:500,自治体:1500};
+const STAFF_RATE=20;
+const MIL_SLOW=0.85;
+// 平時の定期便の座席数（石垣5,261／宮古3,250＋下地島708）。事態緊迫時の自力退避はこの枠を使う
+const SCHEDULED={ISG:5261, MYK:3958};  // 輸送機は旅客機より鈍足
+const CIV={trunkSeat:200,
+  commSeat:39,commSortie:8,heliSeat:9,heliSortie:6,
+  shipFleet:30,shipSeat:600,shipPort:'honshu'};
+const DEPLOY={units:5,perUnit:1200,vehicleFactor:2};  // 往路の船腹所要＝人員×2
+const FERRY_CONV=1.4;  // 民間フェリーの車両甲板転用
+const CARE={ratio:11778/112337,shipOnly:1197/11778,heliOnly:254/11778};
+const MAX_DAYS=60;
+
+const PAR={peak:1.0,viaOkinawa:0,selfEvac:60,selfRes:8,planes:51,helis:8,shipRate:35,alloc:50,dest:'kagoshima',
+         startDelay:3,warn:10,disrupt:60};
+
+function assets(P=PAR){
+  const a=P.alloc/100, D=DESTS[P.dest];
+  // 海上は経路ごとに回転日数が違うので2系統つくる
+  const mkSea=f=>{
+    const rows=SEA.map(s=>{
+      const n=s.num*(s.local?1:a), c=CYCLE[s.port]*f;
+      const lift=n*s.cap*s.conv*s.avail;
+      return {n:s.n,port:s.port,cycle:c,delay:Math.ceil(c/2),lift,daily:lift/c};
+    });
+    const civShips=Math.round(CIV.shipFleet*P.shipRate/100), cc=CYCLE[CIV.shipPort]*f;
+    const cl=civShips*CIV.shipSeat*FERRY_CONV;
+    rows.push({n:`民間船舶 ${civShips}隻`,port:'honshu',cycle:cc,delay:Math.ceil(cc/2),lift:cl,daily:cl/cc});
+    return rows;
+  };
+  const seaOki=mkSea(seaFactorOf(OKI.dist)), seaDir=mkSea(seaFactorOf(D.dist));
+
+  const commN=Math.round(P.planes*0.2), trunkN=P.planes-commN;
+  const milN=AIR.reduce((s,x)=>s+x.num*a,0);
+  const milSeat=milN>0?AIR.reduce((s,x)=>s+x.num*a*x.seat,0)/milN:0;
+
+  const feederAir=commN*CIV.commSeat*CIV.commSortie;
+  const heliCiv=P.helis*CIV.heliSeat*CIV.heliSortie;
+  const heliMilFull=HELI.reduce((s,h)=>s+h.num*(h.local?1:a)*h.seat*h.sortie,0);
+  const staffTotal=Object.values(STAFF).reduce((x,y)=>x+y,0);
+
+  return {seaOki,seaDir,seaRows:seaDir,civShips:Math.round(CIV.shipFleet*P.shipRate/100),
+    commN,trunkN,milN,milSeat,destSlots:D.slots,destName:D.n,destDist:D.dist,destCap:D.cap,
+    feederAir,heliCiv,heliMilFull,ground:staffTotal*STAFF_RATE,staffTotal};
+}
+
+// その日に使える輸送力。経由と直行の2系統に資産を配分する
+function dayCaps(A,deploying,degraded,P=PAR,day=99){
+  const g=degraded?1-P.disrupt/100:1;
+  const al=P.viaOkinawa/100;
+  const originSlots=Math.max(0,ORIGIN_SLOTS-(deploying?MIL_SLOTS.deploy:MIL_SLOTS.after))*g;
+
+  // 航空：機材をα:1-αで割り、経路ごとのソーティ数で便数に直す
+  const civOk=A.trunkN*al, civDir=A.trunkN*(1-al);
+  const milOk=A.milN*al,   milDir=A.milN*(1-al);
+  const sOk=sortieOf(OKI.dist), sDir=sortieOf(A.destDist);
+  const flOk = civOk*sOk  + milOk*sOk*MIL_SLOW;
+  const flDir= civDir*sDir+ milDir*sDir*MIL_SLOW;
+  const seatOk = flOk >0 ? (civOk*sOk*CIV.trunkSeat + milOk*sOk*MIL_SLOW*A.milSeat)/flOk : 0;
+  const seatDir= flDir>0 ? (civDir*sDir*CIV.trunkSeat+ milDir*sDir*MIL_SLOW*A.milSeat)/flDir : 0;
+  // 受入側の上限。どれが実際に効いたかを個別に記録する
+  const okiCap=OKI.slots*g, dirCap=A.destSlots*g;
+  const bindOki = P.viaOkinawa>0 && flOk > okiCap*1.02;
+  const bindDest= flDir > dirCap*1.02;
+  let useOk=Math.min(flOk, okiCap), useDir=Math.min(flDir, dirCap);
+  // 先島側スロットは両経路の共用。超過分は比例配分で削る
+  const tot=useOk+useDir;
+  const bindOrigin = tot > originSlots*1.005;
+  if(tot>originSlots && tot>0){ const k=originSlots/tot; useOk*=k; useDir*=k; }
+
+  // 海上も同じ比率で配分
+  const seaOk =A.seaOki.filter(r=>day>=r.delay).reduce((s,r)=>s+r.daily,0)*al*g;
+  const seaDir=A.seaDir.filter(r=>day>=r.delay).reduce((s,r)=>s+r.daily,0)*(1-al)*g;
+  const seaOutbound=(A.seaOki.filter(r=>day>=r.delay).reduce((s,r)=>s+r.daily,0)*al
+                    +A.seaDir.filter(r=>day>=r.delay).reduce((s,r)=>s+r.daily,0)*(1-al))/1.5*g;
+
+  const heliMil=A.heliMilFull*(deploying?HELI_FOR_CIV.deploy:HELI_FOR_CIV.after)*g;
+  const onward=(ONWARD.slots*ONWARD.seat+ONWARD.sea)*g;
+
+  return {originSlots,useOk,useDir,flOk,flDir,okiCap,dirCap,bindOki,bindDest,bindOrigin,
+    wantFl:flOk+flDir,useFl:useOk+useDir,
+    airOk:useOk*seatOk, airDir:useDir*seatDir, seaOk, seaDir, seaOutbound,
+    toOkinawa:useOk*seatOk+seaOk, toDirect:useDir*seatDir+seaDir,
+    trunkAir:useOk*seatOk+useDir*seatDir, heliMil, onward, g};
+}
+
+function simulate(P=PAR){
+  const A=assets(P);
+  const HUBLIKE=t=>t==='hub'||t==='bridge';
+  const U=ISLANDS.map(i=>{
+    const tour=Math.round(i.lam*i.stay*P.peak), res=i.pop, h=HUBLIKE(i.type);
+    return {...i,res,tour,target:res+tour,
+      homeR:h?0:res, homeT:h?0:tour, hubR:h?res:0, hubT:h?tour:0,
+      shipNeed:res*CARE.ratio*CARE.shipOnly, heliNeed:res*CARE.ratio*CARE.heliOnly};});
+  const target=U.reduce((s,u)=>s+u.target,0);
+  const residents=U.reduce((s,u)=>s+u.res,0);
+  const tourists=U.reduce((s,u)=>s+u.tour,0);
+
+  let naha=0,arrived=0,nahaPeak=0,feederDone=null;
+  let capLeft=A.destCap, capFull=null, selfOut=0, selfRes=0, transitPeak=0;
+  let deployLeft=DEPLOY.units*DEPLOY.perUnit*DEPLOY.vehicleFactor, deployDone=null;
+  const bind={slot:0,sea:0,ground:0,dest:0,onward:0};
+  let effSum=0,effN=0;
+
+  const home=u=>u.homeR+u.homeT, hub=u=>u.hubR+u.hubT;
+  // 量 mv を住民:観光客の比で取り出す。tourFirst なら観光客から先に
+  const takeHome=(u,mv,tourFirst)=>{
+    if(mv<=0) return [0,0];
+    if(tourFirst){ const t=Math.min(mv,u.homeT), r=Math.min(mv-t,u.homeR);
+      u.homeT-=t;u.homeR-=r;return [r,t]; }
+    const tot=home(u); if(tot<=0) return [0,0];
+    const k=Math.min(1,mv/tot), r=u.homeR*k, t=u.homeT*k;
+    u.homeR-=r;u.homeT-=t;return [r,t];
+  };
+  const takeHub=(u,mv,tourFirst)=>{
+    if(mv<=0) return [0,0];
+    if(tourFirst){ const t=Math.min(mv,u.hubT), r=Math.min(mv-t,u.hubR);
+      u.hubT-=t;u.hubR-=r;return [r,t]; }
+    const tot=hub(u); if(tot<=0) return [0,0];
+    const k=Math.min(1,mv/tot), r=u.hubR*k, t=u.hubT*k;
+    u.hubR-=r;u.hubT-=t;return [r,t];
+  };
+
+  const snap=d=>({day:d,
+    home:Object.fromEntries(U.map(u=>[u.id,home(u)])),
+    left:Object.fromEntries(U.map(u=>[u.id,home(u)+hub(u)])),
+    q:{ISG:U.filter(u=>u.hub==='ISG').reduce((s,u)=>s+hub(u),0),
+       MYK:U.filter(u=>u.hub==='MYK').reduce((s,u)=>s+hub(u),0)},
+    naha,deployLeft,arrived,selfOut,selfRes,
+    inSaki:U.reduce((s,u)=>s+home(u)+hub(u),0),
+    remaining:U.reduce((s,u)=>s+home(u)+hub(u),0)+naha});
+  const frames=[snap(0)];
+
+  for(let d=1;d<=MAX_DAYS;d++){
+    const deploying=deployLeft>0, degraded=d>P.warn;
+    const C=dayCaps(A,deploying,degraded,P,d);
+    const started=d>P.startDelay;
+
+    if(deployLeft>0){ deployLeft-=Math.min(C.seaOutbound,deployLeft);
+      if(deployLeft<=0&&deployDone===null) deployDone=d; }
+
+    // ── 公示前：定期便が動いているうちに観光客が自力で帰る
+    if(!started){
+      const wT=P.selfEvac/100, wR=P.selfRes/100;
+      for(const h of ['ISG','MYK']){
+        let seats=SCHEDULED[h]*C.g;
+        // まず観光客。滞在期間が終わる層から順に定期便で帰る
+        for(const u of U.filter(x=>x.hub===h)){
+          if(seats<=0) break;
+          const room=Math.max(0,(u.homeT+u.hubT)-u.tour*(1-wT));
+          const mv=Math.min(seats,room);
+          const t1=Math.min(mv,u.hubT); u.hubT-=t1;
+          const t2=Math.min(mv-t1,u.homeT); u.homeT-=t2;
+          seats-=(t1+t2); selfOut+=(t1+t2); arrived+=(t1+t2);
+        }
+        // 次に住民の自主避難。縁故を頼るため公的な受入枠は消費しない。
+        // 要配慮者は自力では動けないので対象から除く
+        for(const u of U.filter(x=>x.hub===h)){
+          if(seats<=0) break;
+          const mobile=u.res*(1-CARE.ratio);
+          const room=Math.max(0,(u.homeR+u.hubR)-(u.res-mobile*wR));
+          const mv=Math.min(seats,room);
+          const r1=Math.min(mv,u.hubR); u.hubR-=r1;
+          const r2=Math.min(mv-r1,u.homeR); u.homeR-=r2;
+          seats-=(r1+r2); selfRes+=(r1+r2); arrived+=(r1+r2);
+        }
+      }
+      frames.push(snap(d)); continue;
+    }
+
+    // ── 末端
+    let capAir=A.feederAir*C.g, capHeli=A.heliCiv*C.g+C.heliMil, capSea=(C.seaOk+C.seaDir)*0.15;
+    for(const ty of ['strip','heli','port']){
+      for(const u of U.filter(x=>x.type===ty)){
+        let mv=0;
+        if(ty==='strip'){const t=Math.min(capAir,home(u));capAir-=t;mv+=t;}
+        if(ty!=='port'){const t=Math.min(capHeli,home(u)-mv);capHeli-=t;mv+=t;}
+        const t=Math.min(capSea,home(u)-mv,(u.berth||0)*C.g);capSea-=t;mv+=t;
+        if(ty==='port'){const h2=Math.min(capHeli,home(u)-mv);capHeli-=h2;mv+=h2;}
+        const [r,t2]=takeHome(u,mv,false); u.hubR+=r; u.hubT+=t2;
+      }
+    }
+    if(feederDone===null&&U.every(u=>HUBLIKE(u.type)||home(u)<1)) feederDone=d;
+
+    // ── 幹線。長期の受入枠は住民だけが消費する
+    const trunkTotal=C.toOkinawa+C.toDirect;
+    let cap=Math.min(trunkTotal,A.ground);
+    effSum+=cap; effN++;
+    if(A.ground<trunkTotal) bind.ground++;
+    const okShare=trunkTotal>0?C.toOkinawa/trunkTotal:0;
+    let movedR=0,movedT=0;
+
+    // 要配慮者（住民）を海路・ヘリで優先
+    let seaCap=Math.min(C.seaOk+C.seaDir,cap);
+    for(const u of U){
+      const need=u.shipNeed+u.heliNeed; if(need<=0) continue;
+      const mv=Math.min(seaCap,need,u.hubR,Math.max(0,capLeft-movedR));
+      if(mv<=0) continue;
+      const r=mv/need; u.shipNeed-=u.shipNeed*r; u.heliNeed-=u.heliNeed*r;
+      u.hubR-=mv; seaCap-=mv; cap-=mv; movedR+=mv;
+    }
+    // 一般。観光客は受入枠を食わないので、枠が尽きても運べる
+    const rest=U.reduce((s,u)=>s+Math.max(0,hub(u)-u.shipNeed-u.heliNeed),0);
+    if(rest>0&&cap>0){
+      const fr=Math.min(1,cap/rest);
+      for(const u of U){
+        const av=Math.max(0,hub(u)-u.shipNeed-u.heliNeed);
+        let mv=av*fr;
+        // 住民分が受入枠を超えるなら住民だけ削る
+        const ratioR=hub(u)>0?u.hubR/hub(u):0;
+        const wantR=mv*ratioR, roomR=Math.max(0,capLeft-movedR);
+        if(wantR>roomR) mv=roomR+mv*(1-ratioR);
+        const [r,t]=takeHub(u,mv,true);
+        cap-=(r+t); movedR+=r; movedT+=t;
+      }
+      if(fr<1) bind.sea++;
+    }
+    capLeft-=movedR;
+    if(capLeft<=0&&capFull===null) capFull=d;
+    const moved=movedR+movedT;
+    naha+=moved*okShare; arrived+=moved*(1-okShare);
+    transitPeak=Math.max(transitPeak,movedT*1.5);
+
+    if(naha>0){ const mv=Math.min(C.onward,naha); naha-=mv; arrived+=mv; if(naha>0) bind.onward++; }
+    nahaPeak=Math.max(nahaPeak,naha);
+    frames.push(snap(d));
+    if(frames[frames.length-1].remaining<1) break;
+  }
+  const sakiDay=frames.findIndex(f=>f.inSaki<1), allDay=frames.findIndex(f=>f.remaining<1);
+  return {frames,target,residents,tourists,selfOut,selfRes,transitPeak,A,nahaPeak,feederDone,deployDone,bind,
+    capLeft,capFull,capShort:Math.max(0,residents-selfRes-A.destCap), needShelter:residents-selfRes,
+    atWar:frames[Math.min(P.warn,frames.length-1)].remaining,
+    eff:effN?effSum/effN:0,
+    stranded:U.filter(u=>home(u)+hub(u)>0.5).map(u=>u.n),
+    sakiDay:sakiDay>=0?sakiDay:null,allDay:allDay>=0?allDay:null};
+}
+
+/* ===== モンテカルロ ===== */
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function lognorm(med,sig){return med*Math.exp(sig*randn());}
+function expo(mean){return -mean*Math.log(1-Math.random());}
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const MC_VARS=[
+  {k:'startDelay',n:'着手までの日数',dir:-1},
+  {k:'warn',      n:'攻撃までの猶予',dir:+1},
+  {k:'peak',      n:'観光の繁閑',    dir:-1},
+  {k:'planes',    n:'民間飛行機',    dir:+1},
+  {k:'helis',     n:'民間ヘリ',      dir:+1},
+  {k:'shipRate',  n:'船舶の徴用率',  dir:+1},
+  {k:'alloc',     n:'他方面の割当率',dir:+1},
+  {k:'disrupt',   n:'妨害の度合い',  dir:-1},
+  {k:'viaOkinawa',n:'沖縄経由の比率',dir:+1},
+  {k:'selfEvac',  n:'観光客の自力退避',dir:+1},
+  {k:'selfRes',   n:'住民の自主避難',  dir:+1},
+];
+function monteCarlo(N=1200){
+  const out=[],done=[],rows=[];
+  for(let k=0;k<N;k++){
+    const p={...PAR,
+      startDelay: clamp(Math.round(lognorm(Math.max(PAR.startDelay,0.6),0.60)),0,40),
+      warn:       clamp(Math.round(expo(Math.max(PAR.warn,1))),0,60),
+      peak:       clamp(lognorm(PAR.peak,0.28),0.4,3.0),
+      planes:     clamp(Math.round(PAR.planes*(1+0.25*randn())),0,120),
+      helis:      clamp(Math.round(PAR.helis*(1+0.4*randn())),0,80),
+      shipRate:   clamp(PAR.shipRate*(0.4+0.9*Math.random()),0,70),
+      alloc:      clamp(PAR.alloc*(0.5+Math.random()),0,100),
+      disrupt:    clamp(PAR.disrupt+15*randn(),0,100),
+      viaOkinawa: clamp(PAR.viaOkinawa+25*randn(),0,100),
+      selfEvac:   clamp(PAR.selfEvac+25*randn(),0,100),
+      selfRes:    clamp(PAR.selfRes*Math.exp(0.7*randn()),0,40),
+    };
+    const r=simulate(p);
+    out.push(r.atWar); done.push(r.atWar<1?1:0);
+    rows.push({x:MC_VARS.map(v=>p[v.k]), y:r.atWar, ok:r.atWar<1?1:0});
+  }
+  const sens=sensitivity(rows);
+  out.sort((a,b)=>a-b);
+  const q=t=>out[Math.min(out.length-1,Math.floor(t*out.length))];
+  return {out,rows,sens,n:N,pDone:done.reduce((a,b)=>a+b,0)/N,
+    p10:q(0.10),p25:q(0.25),p50:q(0.50),p75:q(0.75),p90:q(0.90),
+    mean:out.reduce((a,b)=>a+b,0)/N};
+}
+
+/* ===== 感度分析 ===== */
+// 順位に変換（同順位は平均順位）
+function ranks(v){
+  const idx=v.map((x,i)=>[x,i]).sort((a,b)=>a[0]-b[0]);
+  const r=new Array(v.length);
+  let i=0;
+  while(i<idx.length){
+    let j=i; while(j+1<idx.length&&idx[j+1][0]===idx[i][0]) j++;
+    const avg=(i+j)/2+1;
+    for(let k=i;k<=j;k++) r[idx[k][1]]=avg;
+    i=j+1;
+  }
+  return r;
+}
+function corr(a,b){
+  const n=a.length, ma=a.reduce((s,x)=>s+x,0)/n, mb=b.reduce((s,x)=>s+x,0)/n;
+  let sab=0,sa=0,sb=0;
+  for(let i=0;i<n;i++){const da=a[i]-ma,db=b[i]-mb;sab+=da*db;sa+=da*da;sb+=db*db;}
+  return (sa*sb)>0 ? sab/Math.sqrt(sa*sb) : 0;
+}
+// ガウス・ジョルダン法による逆行列
+function inv(M){
+  const n=M.length, A=M.map((r,i)=>[...r,...Array.from({length:n},(_,j)=>i===j?1:0)]);
+  for(let c=0;c<n;c++){
+    let p=c; for(let r=c+1;r<n;r++) if(Math.abs(A[r][c])>Math.abs(A[p][c])) p=r;
+    if(Math.abs(A[p][c])<1e-12) return null;
+    [A[c],A[p]]=[A[p],A[c]];
+    const d=A[c][c]; for(let j=0;j<2*n;j++) A[c][j]/=d;
+    for(let r=0;r<n;r++){ if(r===c) continue; const f=A[r][c];
+      if(f) for(let j=0;j<2*n;j++) A[r][j]-=f*A[c][j]; }
+  }
+  return A.map(r=>r.slice(n));
+}
+function sensitivity(rows){
+  const m=MC_VARS.length, n=rows.length;
+  // (1) 中央値分割：入力の上半分と下半分で成功確率がどれだけ違うか
+  const split=MC_VARS.map((v,k)=>{
+    const sorted=rows.map((r,i)=>[r.x[k],i]).sort((a,b)=>a[0]-b[0]);
+    const h=Math.floor(n/2);
+    const lo=sorted.slice(0,h).reduce((s,[,i])=>s+rows[i].ok,0)/h;
+    const hi=sorted.slice(n-h).reduce((s,[,i])=>s+rows[i].ok,0)/h;
+    return {name:v.n, delta:hi-lo, lo, hi};
+  });
+  // (2) PRCC：他の入力を統制したうえでの、残留人数との偏順位相関
+  const cols=MC_VARS.map((_,k)=>ranks(rows.map(r=>r.x[k])));
+  cols.push(ranks(rows.map(r=>r.y)));
+  const C=cols.map(a=>cols.map(b=>corr(a,b)));
+  for(let i=0;i<C.length;i++) C[i][i]=1;
+  const Pm=inv(C);
+  const prcc=MC_VARS.map((v,k)=>{
+    if(!Pm) return {name:v.n,val:0};
+    const y=m, val=-Pm[k][y]/Math.sqrt(Pm[k][k]*Pm[y][y]);
+    return {name:v.n, val:-val};   // 符号反転：正なら「成功に効く」
+  });
+  return {split,prcc};
+}
+
+/* ===== 地図 ===== */
+/* ===== 内蔵ベクター海岸線（タイル不要） ===== */
+const COAST={
+ kyushu:[[130.88,33.90],[131.35,33.63],[131.75,33.28],[131.90,32.90],[131.68,32.42],[131.47,31.75],
+   [131.10,31.38],[130.85,31.25],[130.72,31.00],[130.65,30.98],[130.55,31.25],[130.20,31.25],
+   [130.15,31.55],[130.20,32.00],[130.45,32.60],[130.20,32.75],[130.35,33.00],[130.15,33.25],
+   [129.85,33.05],[129.70,33.30],[129.90,33.55],[130.30,33.60],[130.55,33.75]],
+ shikoku:[[134.05,34.25],[134.75,34.20],[134.60,33.85],[134.20,33.55],[133.30,33.20],[132.75,32.75],
+   [132.40,33.00],[132.55,33.55],[133.00,34.00],[133.60,34.20]],
+ honshu:[[130.90,34.40],[131.50,34.75],[132.50,35.45],[133.30,35.55],[134.60,35.65],[135.40,35.65],
+   [136.05,35.75],[136.75,37.50],[137.20,36.80],[138.30,37.20],[139.60,38.10],[140.90,38.30],
+   [141.05,38.30],[140.90,37.00],[140.20,36.00],[139.80,35.65],[139.75,35.30],[139.15,34.90],
+   [138.50,34.60],[137.00,34.60],[136.80,34.30],[135.90,33.50],[135.10,34.30],[134.20,34.35],
+   [132.50,34.35],[131.60,34.20]],
+ okinawa:[[128.33,26.87],[128.25,26.70],[127.95,26.55],[127.75,26.35],[127.65,26.20],[127.72,26.10],
+   [127.83,26.14],[128.00,26.45],[128.20,26.62],[128.40,26.78]],
+ kumejima:[[126.70,26.31],[126.83,26.33],[126.83,26.39],[126.70,26.37]],
+ amami:[[129.25,28.20],[129.55,28.42],[129.72,28.32],[129.55,28.15],[129.35,28.00],[129.15,28.08]],
+ tokunoshima:[[128.85,27.72],[129.02,27.85],[129.05,27.75],[128.92,27.65]],
+ okinoerabu:[[128.53,27.35],[128.70,27.42],[128.68,27.35],[128.55,27.30]],
+ yakushima:[[130.35,30.28],[130.55,30.35],[130.65,30.28],[130.55,30.20],[130.38,30.20]],
+ tanegashima:[[130.85,30.45],[131.05,30.75],[131.08,30.83],[130.95,30.80],[130.83,30.55]],
+ ishigaki:[[124.05,24.32],[124.13,24.25],[124.20,24.30],[124.30,24.42],[124.32,24.53],[124.27,24.62],
+   [124.22,24.58],[124.17,24.45],[124.10,24.40]],
+ iriomote:[[123.68,24.28],[123.80,24.22],[123.92,24.25],[123.93,24.38],[123.85,24.42],[123.72,24.40]],
+ miyako:[[125.16,24.72],[125.22,24.66],[125.34,24.72],[125.45,24.78],[125.42,24.87],[125.28,24.92],
+   [125.18,24.85]],
+ irabu:[[125.155,24.862],[125.225,24.858],[125.222,24.790],[125.160,24.782]],
+ shimojiI:[[125.122,24.856],[125.152,24.856],[125.152,24.796],[125.126,24.800]],
+ ikema:[[125.240,24.912],[125.278,24.912],[125.278,24.946],[125.240,24.944]],
+ kurima:[[125.240,24.720],[125.272,24.720],[125.272,24.746],[125.240,24.744]],
+ yonaguni:[[122.93,24.44],[123.02,24.44],[123.02,24.50],[122.93,24.49]],
+ tarama:[[124.66,24.635],[124.73,24.635],[124.73,24.695],[124.66,24.695]],
+ hateruma:[[123.75,24.045],[123.81,24.045],[123.81,24.075],[123.75,24.075]],
+ kohama:[[123.955,24.325],[123.995,24.325],[123.995,24.365],[123.955,24.365]],
+ taketomi:[[124.075,24.325],[124.105,24.325],[124.105,24.345],[124.075,24.345]],
+ kuroshima:[[124.000,24.225],[124.035,24.225],[124.035,24.255],[124.000,24.255]],
+ taiwan:[[121.60,25.30],[122.00,25.00],[121.90,24.00],[121.40,23.10],[120.90,22.00],[120.25,22.50],
+   [120.10,23.50],[120.70,24.50],[121.00,25.15]],
+};
+function addCoast(map){
+  const g=L.layerGroup();
+  Object.entries(COAST).forEach(([k,pts])=>{
+    L.polygon(pts.map(p=>[p[1],p[0]]),{
+      color:'#8C7F63',weight:.9,fillColor:'#E9DDC2',fillOpacity:1,
+      interactive:false}).addTo(g);
+  });
+  g.addTo(map);
+  return g;
+}
+
+const map=L.map('map',{minZoom:3}).setView([29,128],5);
+L.control.scale({imperial:false}).addTo(map);
+addCoast(map);
+let tileLayer=null;
+function toggleTiles(){
+  const btn=document.getElementById('tileBtn');
+  if(tileLayer){ map.removeLayer(tileLayer); tileLayer=null; btn.textContent='地図タイル'; return; }
+  btn.textContent='読込中…';
+  let ok=false;
+  tileLayer=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    {subdomains:'abcd',maxZoom:16,attribution:'&copy; OpenStreetMap contributors &copy; CARTO'});
+  tileLayer.on('load',()=>{ok=true;btn.textContent='タイルを消す';});
+  tileLayer.addTo(map);
+  setTimeout(()=>{ if(!ok&&tileLayer){ map.removeLayer(tileLayer); tileLayer=null;
+    btn.textContent='地図タイル';
+    const w=document.getElementById('tilewarn');
+    w.textContent='この環境では外部の地図タイルを取得できません。内蔵の海岸線で表示しています。';
+    w.style.display='block'; setTimeout(()=>w.style.display='none',5000); } },4000);
+}
+const routeL=L.layerGroup().addTo(map);
+const apLayer=L.layerGroup().addTo(map);
+function activeAps(){ const ids=DESTS[PAR.dest].aps; return KYUSHU_AP.filter(a=>ids.includes(a.id)); }
+function drawRoutes(){
+  routeL.clearLayers(); apLayer.clearLayers();
+  const via=PAR.viaOkinawa/100, act=activeAps();
+  const tot=act.reduce((s,a)=>s+a.share,0)||1;
+
+  // 受入空港のマーカー：使う空港は塗り、使わない空港は輪郭だけ
+  KYUSHU_AP.forEach(a=>{
+    const on=act.some(x=>x.id===a.id);
+    L.circleMarker([a.lat,a.lng],{
+      radius: on? 3.5+Math.sqrt(a.share)*1.1 : 2.6,
+      color:'#17242F',weight:on?1.4:1,
+      fillColor: on?'#C05A24':'#F6F1E4', fillOpacity: on?.55:.9,
+      interactive:true})
+     .bindTooltip(on?`${a.n}空港　${Math.round(a.share/tot*DESTS[PAR.dest].slots)}便/日`:`${a.n}空港（不使用）`,
+       {className:'lab',permanent:on&&act.length<=3,direction:'right',offset:[6,0]})
+     .addTo(apLayer);
+  });
+
+  // 先島 → 九州（直行分）。使う空港ごとに線を引き、太さは配分に比例
+  ['ISG','MYK'].forEach(h=>{
+    act.forEach(a=>{
+      const w=0.7+2.0*(a.share/tot);
+      L.polyline([[HUBS[h].lat,HUBS[h].lng],[a.lat,a.lng]],
+        {color:'#17242F',weight:via<1?w:0.6,opacity:via<1?.55:.15,
+         className:via<1?'flow':'', dashArray:via<1?null:'2 6'}).addTo(routeL);
+    });
+    // 海路は最寄りの港へ
+    L.polyline([HUBS[h].port,[KAGO.lat-0.2,KAGO.lng-0.15]],
+      {color:'#1F6E7B',weight:1.2,opacity:via<1?.6:.2,dashArray:'4 5'}).addTo(routeL);
+  });
+
+  // 先島 → 那覇（経由分）。比率が1%でもあれば実線＋流動アニメ
+  ['ISG','MYK'].forEach(h=>{
+    const on=via>0;
+    L.polyline([[HUBS[h].lat,HUBS[h].lng],[NAHA.lat,NAHA.lng]],
+      {color:'#5B4A87',weight:on?(0.9+2.2*via):0.8,opacity:on?.75:.18,
+       className:on?'flow':'', dashArray:on?null:'3 6'}).addTo(routeL);
+  });
+  // 那覇 → 本土（二次輸送）
+  act.forEach(a=>{
+    const on=via>0;
+    L.polyline([[NAHA.lat,NAHA.lng],[a.lat,a.lng]],
+      {color:'#5B4A87',weight:on?(0.8+1.6*via*(a.share/tot)*act.length/2):0.6,
+       opacity:on?.55:.12, dashArray:on?'9 4':'2 8'}).addTo(routeL);
+  });
+
+  // 末端（離島→拠点島）と母港からの進出
+  ISLANDS.filter(i=>i.type!=='hub').forEach(i=>L.polyline([[i.lat,i.lng],[HUBS[i.hub].lat,HUBS[i.hub].lng]],
+    {color:'#96256B',weight:.9,opacity:.4,dashArray:'2 4'}).addTo(routeL));
+  PORTS.forEach(p=>L.polyline([[p.lat,p.lng],[HUBS.MYK.lat,HUBS.MYK.lng]],
+    {color:'#17242F',weight:.8,opacity:.25,dashArray:'1 6'}).addTo(routeL));
+}
+const mk={};
+ISLANDS.forEach(i=>mk[i.id]=L.circleMarker([i.lat,i.lng],{radius:5,color:'#96256B',weight:1.3,fillColor:'#96256B',fillOpacity:.5}).addTo(map));
+const nahaM=L.circleMarker([NAHA.lat,NAHA.lng],{radius:5,color:'#5B4A87',weight:1.4,fillColor:'#5B4A87',fillOpacity:.15}).addTo(map);
+PORTS.forEach(p=>L.circleMarker([p.lat,p.lng],{radius:3.5,color:'#17242F',weight:1.2,fillColor:'#17242F',fillOpacity:.55})
+  .addTo(map).bindTooltip(p.n,{className:'lab',permanent:true,direction:'right',offset:[6,0]}));
+nahaM.bindTooltip('那覇',{className:'lab',permanent:true,direction:'right',offset:[6,0]});
+
+/* ===== 描画 ===== */
+const $=id=>document.getElementById(id), fmt=n=>Math.round(n).toLocaleString('ja-JP');
+let RUN=simulate(),day=0,playing=false,timer=null;
+
+function render(){
+  const f=RUN.frames[Math.min(day,RUN.frames.length-1)];
+  $('daySlider').max=Math.max(RUN.frames.length-1,1); $('daySlider').value=day;
+  ISLANDS.forEach(i=>{
+    const u=RUN.frames[0].left[i.id],left=f.left[i.id],m=mk[i.id];
+    m.setRadius(3.5+Math.sqrt(Math.max(left,0))/17);
+    const on=u>0?left/u:0,c=on>0.02?'#96256B':'#1F6E7B';
+    m.setStyle({color:c,fillColor:c,fillOpacity:on>0.02?.5:.18});
+    m.bindPopup(`<div class="pp-t">${i.n}</div><div class="pp-r"><span>対象</span><b>${fmt(u)}</b></div>`+
+      `<div class="pp-r"><span>残</span><b>${fmt(left)}</b></div>`+
+      `<div class="pp-r"><span>手段</span><b>${{hub:'幹線空港',bridge:'架橋で拠点島と一体',strip:'小滑走路',heli:'ヘリポート',port:'港のみ'}[i.type]}</b></div>`);
+  });
+  nahaM.setRadius(4+Math.sqrt(Math.max(f.naha,0))/17);
+  nahaM.setStyle({fillOpacity:f.naha>0?.55:.15});
+  nahaM.setTooltipContent(`那覇　滞留 ${fmt(f.naha)}`);
+
+  const A=RUN.A,sd=RUN.sakiDay,ad=RUN.allDay;
+  $('kSaki').className='kpi '+(sd===null?'alert':(sd<=6?'good':(sd<=12?'':'alert')));
+  $('kSaki').querySelector('.v').innerHTML=sd===null?`60日<small>超</small>`:`${sd}<small>日</small>`;
+  $('kAll').className='kpi '+(ad===null?'alert':(ad<=8?'good':(ad<=16?'':'alert')));
+  $('kAll').querySelector('.v').innerHTML=ad===null?`60日<small>超</small>`:`${ad}<small>日</small>`;
+  if(PAR.viaOkinawa>0){
+    $('kSub').querySelector('.k').textContent='那覇滞留ピーク';
+    $('kSub').className='kpi '+(RUN.nahaPeak>30000?'alert':'');
+    $('kSub').querySelector('.v').innerHTML=`${fmt(RUN.nahaPeak)}<small>人</small>`;
+  }else{
+    $('kSub').querySelector('.k').textContent='小離島の搬出完了';
+    $('kSub').className='kpi '+(RUN.feederDone===null?'alert':(RUN.feederDone<=3?'good':''));
+    $('kSub').querySelector('.v').innerHTML=RUN.feederDone===null?`未完<small>了</small>`:`${RUN.feederDone}<small>日</small>`;
+  }
+  $('kDep').className='kpi '+(RUN.deployDone===null?'alert':(RUN.deployDone<=5?'good':''));
+  $('kDep').querySelector('.v').innerHTML=RUN.deployDone===null?`未完<small>了</small>`:`${RUN.deployDone}<small>日</small>`;
+  $('kAtWar').className='kpi '+(RUN.atWar<1?'good':(RUN.atWar>20000?'alert':''));
+  $('kAtWar').querySelector('.v').innerHTML=`${fmt(RUN.atWar)}<small>人</small>`;
+  $('kSelf').className='kpi '+(RUN.selfOut>RUN.tourists*0.5?'good':'');
+  $('kRes').className='kpi '+(RUN.capShort>0?'alert':(RUN.A.destCap-RUN.residents<5000?'':'good'));
+  $('kRes').querySelector('.v').innerHTML=`${fmt(RUN.needShelter)}<small>/枠${fmt(RUN.A.destCap)}</small>`;
+  $('kSelf').querySelector('.k').textContent='自力退避（観光/住民）';
+  $('kSelf').querySelector('.v').innerHTML=`${fmt(RUN.selfOut)}<small>/${fmt(RUN.selfRes)}</small>`;
+  $('kEff').querySelector('.k').textContent=RUN.capShort>0?'受入枠の不足':'実効輸送力';
+  $('kEff').className='kpi '+(RUN.capShort>0?'alert':'');
+  $('kEff').querySelector('.v').innerHTML=RUN.capShort>0
+    ?`${fmt(RUN.capShort)}<small>人</small>`:`${fmt(RUN.eff)}<small>/日</small>`;
+
+  const C0=dayCaps(A,false,false,PAR,99);
+  let bn,bd;
+  if(RUN.capShort>0){
+    bn='受入先の収容力';
+    bd=`${A.destName}の受入枠${fmt(A.destCap)}人に対し、長期の滞在先が要る住民は${fmt(RUN.needShelter)}人。`+
+       `${fmt(RUN.capShort)}人分の行き先がない。観光客${fmt(RUN.tourists)}人と自主避難した住民${fmt(RUN.selfRes)}人はこの枠を消費しない。`;
+  }else if(RUN.atWar>RUN.target*0.15){
+    bn='時間';
+    bd=`決心から${PAR.startDelay}日の準備を経て輸送を始め、猶予${PAR.warn}日の時点でなお${fmt(RUN.atWar)}人が域内に残る。`+
+       `輸送力ではなく着手の遅さが結果を決めている。`;
+  }else if(C0.bindOrigin){
+    bn='先島側の空港スロット';
+    const bits=[];
+    if(C0.bindOki)  bits.push(`那覇${Math.round(C0.okiCap)}便`);
+    if(C0.bindDest) bits.push(`${A.destName}${Math.round(C0.dirCap)}便`);
+    bd=`機材は1日${Math.round(C0.wantFl)}便を飛ばせるが、石垣${SPOTS.ishigaki.spot}・宮古${SPOTS.miyako.spot}・下地島${SPOTS.shimoji.spot}のスポットから出せるのは${ORIGIN_SLOTS}便、`+
+       `展開・補給の分を引いて${Math.round(C0.originSlots)}便が上限。受入側にはまだ余裕がある`+
+       (bits.length?`が、${bits.join('と')}の枠も同時に効いている`:'')+`。`;
+  }else if(C0.bindOki&&!C0.bindDest){
+    bn='那覇の受入枠';
+    bd=`沖縄経由に回した機材は1日${Math.round(C0.flOk)}便を飛ばせるが、那覇空港でさばけるのは${Math.round(C0.okiCap)}便。`+
+       `経由比率を下げて直行に振り替えたほうが総量は増える。`;
+  }else if(C0.bindDest){
+    bn='受入側の空港';
+    bd=`直行分は1日${Math.round(C0.flDir)}便を飛ばせるが、${A.destName}でさばけるのは${Math.round(C0.dirCap)}便。`+
+       `受入範囲を広げるか、沖縄経由に振り分ければ出口が増える。`;
+  }else if(RUN.bind.sea>2){
+    bn='幹線の輸送力';
+    bd=`航空${fmt(C0.trunkAir)}人／日、海上${fmt(C0.seaOk+C0.seaDir)}人／日。母港運用のため海上は回転日数に強く縛られる。`;
+  }else if(A.ground<C0.trunkAir+C0.seaOk+C0.seaDir){
+    bn='地上処理要員';
+    bd=`要員${fmt(A.staffTotal)}名では1日${fmt(A.ground)}人しかさばけない。`;
+  }else{
+    bn='末端の接続';
+    bd=`滑走路のない島から拠点島までが1日${fmt(A.feederAir+A.heliCiv+C0.heliMil)}人分。ここが最後に残る細さ。`;
+  }
+  if(RUN.deployDone&&RUN.deployDone>3)
+    bd+=` 開始から${RUN.deployDone}日目までは船腹と大型ヘリの多くが即応機動連隊5個の展開に拘束される。`;
+  if(PAR.viaOkinawa>0&&RUN.nahaPeak>15000)
+    bd+=` 那覇に最大${fmt(RUN.nahaPeak)}人が滞留し、本土への二次輸送が次の関門になる。`;
+  if(RUN.stranded.length) bd+=` 取り残される島：${RUN.stranded.join('、')}。`;
+  $('bn').textContent=bn; $('bnd').textContent=bd;
+  $('verdict').textContent=RUN.atWar>RUN.target*0.5?'間に合わない'
+    :(RUN.atWar>RUN.target*0.15?'大幅に取り残す':(sd===null?'破綻':(sd<=8?'成立':'遅延')));
+
+  const pipe=$('pipe');pipe.innerHTML='';
+  [['ISG','八重山'],['MYK','宮古']].forEach(([h,label])=>{
+    ISLANDS.filter(i=>i.hub===h).forEach(i=>{
+      const u=RUN.frames[0].left[i.id],left=f.left[i.id]; if(u<1)return;
+      const r=document.createElement('div');r.className='pipe-row';
+      r.innerHTML=`<div class="pipe-name">${i.n}</div><div class="bar"><i class="done" style="width:${((1-left/u)*100).toFixed(1)}%"></i></div><div class="pipe-num mono">${fmt(left)}</div>`;
+      pipe.appendChild(r);});
+    const q=f.q[h],r=document.createElement('div');r.className='pipe-row';
+    r.innerHTML=`<div class="pipe-name">${label}拠点<br>待機</div><div class="bar"><i class="queue" style="width:${Math.min(100,q/400).toFixed(1)}%"></i></div><div class="pipe-num mono">${fmt(q)}</div>`;
+    pipe.appendChild(r);});
+  if(PAR.viaOkinawa>0){const r=document.createElement('div');r.className='pipe-row';
+    r.innerHTML=`<div class="pipe-name">那覇<br>滞留</div><div class="bar"><i class="naha" style="width:${Math.min(100,f.naha/600).toFixed(1)}%"></i></div><div class="pipe-num mono">${fmt(f.naha)}</div>`;
+    pipe.appendChild(r);}
+  {const tot=DEPLOY.units*DEPLOY.perUnit*DEPLOY.vehicleFactor,r=document.createElement('div');r.className='pipe-row';
+   r.innerHTML=`<div class="pipe-name">即機連<br>往路</div><div class="bar"><i class="dep" style="width:${Math.min(100,(1-f.deployLeft/tot)*100).toFixed(1)}%"></i></div><div class="pipe-num mono">${fmt(Math.max(0,f.deployLeft))}</div>`;
+   pipe.appendChild(r);}
+
+  $('dayNum').textContent=`${f.day}日目`;
+  $('dayPct').textContent=f.day===0?'避難開始前':`本土到達 ${(RUN.target>0?f.arrived/RUN.target*100:0).toFixed(1)}%`;
+  $('dayEcho').textContent=`${f.day}日目`;
+  spark();
+}
+
+function renderCap(){
+  const A=assets(), C=dayCaps(A,false,false,PAR,99);
+  const seaAll=C.seaOk+C.seaDir;
+  const rows=[
+    ['航空（幹線）',C.trunkAir,'hd'],
+    [`　直行 ${A.destName}　${Math.round(C.useDir)}便`,C.airDir,'sub'],
+    ...(PAR.viaOkinawa>0?[[`　沖縄経由　${Math.round(C.useOk)}便`,C.airOk,'sub']]:[]),
+    [`　要求 ${Math.round(C.wantFl)}便／先島側枠 ${Math.round(C.originSlots)}便`,0,'sub'],
+    [`　距離 ${fmt(A.destDist)}km・1機${sortieOf(A.destDist).toFixed(2)}便/日`,0,'sub'],
+    [`　長期受入枠 ${fmt(A.destCap)}人（住民のみが消費）`,0,'sub'],
+    ['海上（幹線・転用込み）',seaAll,'hd'],
+    [`　直行 ${A.destName}`,C.seaDir,'sub'],
+    ...(PAR.viaOkinawa>0?[['　沖縄経由',C.seaOk,'sub']]:[]),
+    ...(PAR.viaOkinawa>0?[['那覇→本土の二次輸送',C.onward,'hd']]:[]),
+    ['末端（離島→拠点島）',A.feederAir+A.heliCiv+C.heliMil+seaAll*0.15,'hd'],
+    [`　コミューター機 ${A.commN}機`,A.feederAir,'sub'],
+    [`　民間ヘリ ${PAR.helis}機`,A.heliCiv,'sub'],
+    ['　官ヘリ（展開後・7割充当）',C.heliMil,'sub'],
+    ['地上処理能力',A.ground,'cap']];
+  $('capTable').querySelector('tbody').innerHTML=rows.map(r=>{
+    const bind=r[2]==='cap'&&A.ground<C.trunkAir+seaAll;
+    return `<tr class="${r[2]==='sub'?'sub':r[2]==='hd'?'hd':''}"><td>${r[0]}</td><td class="mono ${bind?'bind':''}">${r[1]?fmt(r[1]):''}</td></tr>`;}).join('');
+  $('capTotal').textContent=`幹線 ${fmt(Math.min(C.trunkAir+seaAll,A.ground))} 人／日`;
+
+  const fx=[['即応機動連隊の展開',`${DEPLOY.units}個・約${fmt(DEPLOY.units*DEPLOY.perUnit)}名`],
+    ['展開中の官ヘリ充当',`${Math.round(HELI_FOR_CIV.deploy*100)}%（完了後 ${Math.round(HELI_FOR_CIV.after*100)}%）`],
+    ['展開・補給が使う便数',`${MIL_SLOTS.deploy}便（完了後 ${MIL_SLOTS.after}便）`],
+    ['先島側の駐機スポット',`石垣${SPOTS.ishigaki.spot}・宮古${SPOTS.miyako.spot}・下地島${SPOTS.shimoji.spot}`],
+    ['　1日の便数上限',`${ORIGIN_SLOTS}便`],
+    ['那覇の受入枠',`${OKI.slots}便／日`],
+    ['那覇→本土の枠',`${ONWARD.slots}便＋海路${fmt(ONWARD.sea)}人`],
+    ['車両甲板の旅客転用',`揚陸艦1.6倍・フェリー1.4倍`],
+    ['避難支援要員',`${fmt(Object.values(STAFF).reduce((a,b)=>a+b,0))}名`],
+    ['先島の有人島',`${ISLANDS.length}島（宮古8・八重山10）`],
+    ['　拠点島',`${ISLANDS.filter(i=>i.type==='hub').length}島`],
+    ['　架橋で一体',`${ISLANDS.filter(i=>i.type==='bridge').length}島`],
+    ['　小滑走路あり',`${ISLANDS.filter(i=>i.type==='strip').length}島`],
+    ['　ヘリポートのみ',`${ISLANDS.filter(i=>i.type==='heli').length}島`],
+    ['　港のみ',`${ISLANDS.filter(i=>i.type==='port').length}島`],
+    ['算入しない',`尖閣専従PL10隻・護衛艦・掃海艇`]];
+  $('fixTable').querySelector('tbody').innerHTML=fx.map(r=>
+    `<tr class="${r[0].startsWith('　')?'sub':''}"><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+}
+
+function spark(){
+  const svg=$('spark'),W=150,H=34,p=3,f=RUN.frames,mx=RUN.target||1,n=Math.max(f.length-1,1);
+  const pts=f.map((fr,i)=>`${(p+i/n*(W-2*p)).toFixed(1)},${(p+(1-fr.arrived/mx)*(H-2*p)).toFixed(1)}`).join(' ');
+  const cf=f[Math.min(day,n)];
+  svg.innerHTML=`<line x1="${p}" y1="${p}" x2="${W-p}" y2="${p}" stroke="#B9AC90" stroke-width=".5"/>`+
+   `<polyline points="${pts}" fill="none" stroke="#96256B" stroke-width="1.4"/>`+
+   `<circle cx="${(p+Math.min(day,n)/n*(W-2*p)).toFixed(1)}" cy="${(p+(1-cf.arrived/mx)*(H-2*p)).toFixed(1)}" r="2.6" fill="#17242F"/>`+
+   `<text x="${W-p}" y="${H-1}" text-anchor="end" font-size="7" fill="#4A5A66">本土到達率</text>`;
+}
+$('mcRun').addEventListener('click',()=>{
+  const btn=$('mcRun'); btn.textContent='計算中…'; btn.disabled=true;
+  setTimeout(()=>{
+    const M=monteCarlo(1200);
+    $('mcOut').style.display='block'; $('mcN').textContent=`${M.n}回`;
+    const tot=simulate().target, mx=Math.max(M.out[M.out.length-1],1);
+    const bins=24, h=new Array(bins).fill(0);
+    M.out.forEach(v=>h[Math.min(bins-1,Math.floor(v/mx*bins))]++);
+    const hm=Math.max(...h), W=336,H=96,bw=W/bins;
+    $('mcHist').innerHTML=h.map((v,i)=>{
+      const bh=v/hm*(H-16);
+      return `<rect x="${(i*bw).toFixed(1)}" y="${(H-14-bh).toFixed(1)}" width="${(bw-1).toFixed(1)}" height="${bh.toFixed(1)}" fill="${i===0?'#3F7A4B':'#96256B'}" opacity="${i===0?0.75:0.5}"/>`;
+    }).join('')+
+      `<line x1="0" y1="${H-14}" x2="${W}" y2="${H-14}" stroke="#B9AC90" stroke-width=".8"/>`+
+      `<text x="2" y="${H-3}" font-size="8" fill="#4A5A66">0人</text>`+
+      `<text x="${W-2}" y="${H-3}" text-anchor="end" font-size="8" fill="#4A5A66">${fmt(mx)}人</text>`;
+    const rows=[['全員を搬出できた確率',`${(M.pDone*100).toFixed(1)}%`],
+      ['中央値（P50）',`${fmt(M.p50)}人`],
+      ['楽観側 P10',`${fmt(M.p10)}人`],['P25',`${fmt(M.p25)}人`],
+      ['P75',`${fmt(M.p75)}人`],['悲観側 P90',`${fmt(M.p90)}人`],
+      ['対象人員',`${fmt(tot)}人`]];
+    $('mcTable').querySelector('tbody').innerHTML=rows.map(r=>
+      `<tr><td>${r[0]}</td><td class="mono">${r[1]}</td></tr>`).join('');
+    // 感度分析
+    const S=[...M.sens.split].map((d,i)=>({...d,prcc:M.sens.prcc[i].val}))
+      .sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+    const mxd=Math.max(...S.map(x=>Math.abs(x.delta)),0.01);
+    $('tornado').innerHTML=S.map(x=>{
+      const w=Math.abs(x.delta)/mxd*50, pos=x.delta>=0;
+      return `<div class="tor"><div class="l">${x.name}</div>`+
+        `<div class="t"><div class="mid"></div>`+
+        `<i style="${pos?`left:50%;width:${w}%;background:#3F7A4B`:`right:50%;width:${w}%;background:#B3341F`};opacity:.65"></i>`+
+        `</div><div class="v mono">${(x.delta*100>=0?'+':'')}${(x.delta*100).toFixed(1)}</div></div>`;
+    }).join('');
+    $('sensNote').innerHTML=`各変数を中央値で二分し、上半分と下半分で「全員を搬出できた確率」がどれだけ違うかを百分点で示した。`+
+      `緑は値が大きいほど成功しやすい変数、赤は逆。順位相関で他変数を統制したPRCCは `+
+      S.map(x=>`${x.name} ${x.prcc>=0?'+':''}${x.prcc.toFixed(2)}`).join('／')+`。`;
+    $('mcNote').innerHTML=`着手日数は中央値${PAR.startDelay}日の対数正規、猶予は平均${PAR.warn}日の指数分布、`+
+      `観光ピーク・機材数・徴用率・割当率・妨害度にもばらつきを与えた。横軸は攻撃開始時点の域内残留人数、左端の緑が「残留ゼロ」。`;
+    btn.textContent='もう1,200回まわす'; btn.disabled=false;
+  },30);
+});
+function recompute(){RUN=simulate();if(day>RUN.frames.length-1)day=RUN.frames.length-1;renderCap();render();}
+
+[['sPeak','peak',v=>`約${fmt(ISLANDS.reduce((s,i)=>s+i.lam*i.stay,0)*v/100)}人`],['sPln','planes',v=>`${v} 機`],['sHeli','helis',v=>`${v} 機`],
+ ['sShip','shipRate',v=>`${v}%（${Math.round(30*v/100)}隻）`],['sAlloc','alloc',v=>`${v}%`],['sVia','viaOkinawa',v=>`${v}%`],['sSelf','selfEvac',v=>`${v}%`],['sSelfR','selfRes',v=>`${v}%`],
+ ['sStart','startDelay',v=>`${v} 日`],['sWarn','warn',v=>`${v} 日`],['sDis','disrupt',v=>`${v}%低下`]]
+.forEach(([id,k,fn])=>{const el=$(id),out=$('v'+id.slice(1));
+  const sync=()=>{PAR[k]=(k==='peak'?+el.value/100:+el.value);out.textContent=fn(+el.value);};
+  el.addEventListener('input',()=>{sync();if(k==='viaOkinawa')drawRoutes();recompute();});sync();});
+
+document.querySelectorAll('#segDest button,#segDest2 button').forEach(b=>b.addEventListener('click',()=>{
+  PAR.dest=b.dataset.d;
+  document.querySelectorAll('#segDest button,#segDest2 button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.d===PAR.dest)));
+  $('destHint').textContent=DEST_HINT[PAR.dest];
+  drawRoutes();recompute();}));
+const DEST_HINT={
+ kagoshima:'鹿児島空港1港が出口。1日50便で頭打ちになり、受入枠も13,800人しかない。',
+ fukuoka:'福岡空港は過密で受入便数が少ない。受入枠は47,400人。',
+ kyushu:'政府計画の想定範囲。8県32市町で112,800人を受け入れる。距離1,080km。',
+ chushikoku:'中国四国8空港を加える。距離は1,330kmに伸び1機あたりの往復が1.8→1.6便に落ちるが、受入枠は19万人に増える。',
+ kansai:'関西3空港まで広げる。距離1,420km、往復1.55便。受入枠31万人。',
+ national:'関東・中部まで含めた全国分散。距離1,550km、往復1.48便。受入枠60万人で収容の心配は消える。'};
+$('destHint').textContent=DEST_HINT[PAR.dest];
+$('daySlider').addEventListener('input',e=>{day=+e.target.value;render();});
+$('play').addEventListener('click',()=>{playing=!playing;$('play').textContent=playing?'❚❚':'▶';
+  if(playing){if(day>=RUN.frames.length-1)day=0;
+    timer=setInterval(()=>{day++;if(day>=RUN.frames.length-1){day=RUN.frames.length-1;stop();}render();},480);}else stop();});
+function stop(){playing=false;$('play').textContent='▶';clearInterval(timer);}
+document.getElementById('tileBtn').addEventListener('click',toggleTiles);
+document.querySelectorAll('#views button[data-v]').forEach(b=>b.addEventListener('click',()=>{
+  const v=b.dataset.v;
+  if(v==='saki')map.fitBounds([[23.9,122.7],[25.1,125.6]],{padding:[20,20]});
+  else if(v==='all')map.fitBounds([[23.8,122.6],[34.2,132.2]],{padding:[20,20]});
+  else map.fitBounds([[23.8,122.6],[36.0,140.2]],{padding:[20,20]});}));
+setTimeout(()=>{try{toggleTiles();}catch(e){}},400);
+drawRoutes();map.fitBounds([[23.8,122.6],[34.4,132.5]],{padding:[20,20]});
+function peakHint(){
+  const t=ISLANDS.reduce((s,i)=>s+i.lam*i.stay*PAR.peak,0);
+  $('peakHint').textContent=`平常期の約${fmt(ISLANDS.reduce((s,i)=>s+i.lam*i.stay,0))}人に対し ${PAR.peak.toFixed(2)}倍。島別に入域者数×平均在島日数で算出。政府想定は約1万人。`;
+}
+const _rc=recompute; recompute=function(){_rc();peakHint();};
+renderCap();render();peakHint();
+setTimeout(()=>map.invalidateSize(),200);
+window.addEventListener('resize',()=>map.invalidateSize());
+</script>
+</body>
+</html>
