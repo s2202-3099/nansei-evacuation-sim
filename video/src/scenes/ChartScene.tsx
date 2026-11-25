@@ -14,8 +14,6 @@ const LINES = [
   {s: SCN.kagoshima, color: C.dest, label: '鹿児島だけ', w: 7},
 ];
 
-export const CHART_LEN = 480;
-
 export const ChartScene: React.FC = () => {
   const f = useCurrentFrame();
   const drawn = interpolate(f, [40, 220], [0, XMAX], {...clamp, easing: Easing.bezier(0.4, 0, 0.6, 1)});
@@ -66,7 +64,7 @@ export const ChartScene: React.FC = () => {
         <text x={X1 + 12} y={sy(kEnd.inSaki) + 26} fontSize={24} fill={C.dest} fontWeight={700} opacity={ann(230)}>{fmt(kEnd.inSaki)}人</text>
       </svg>
       {/* 注記 */}
-      <Note x={sx(5.2)} y={sy(k.atWar) - 150} o={ann(250)} color={C.dest}>
+      <Note x={sx(5.2)} y={sy(k.atWar) - 150} o={ann(140)} color={C.dest}>
         鹿児島だけでは、{k.capFull}日目に受入枠{fmt(k.destCap)}人が満杯。<br />
         約{man(k.atWar)}人が島に残る
       </Note>

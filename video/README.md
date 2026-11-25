@@ -28,6 +28,19 @@ npx remotion render NanseiEvacuation out/nansei-evacuation.mp4
 REMOTION_BROWSER=/path/to/chrome-headless-shell npx remotion render NanseiEvacuation out/nansei-evacuation.mp4
 ```
 
+## ナレーション
+
+原稿は `scripts/narration.json`。音声は Open JTalk（pyopenjtalk-plus）でオフライン生成しています。
+
+```bash
+pip install pyopenjtalk-plus numpy
+python scripts/make-narration.py          # 原稿から public/narration/*.wav を作り、長さを測る
+```
+
+各シーンの尺はナレーションの長さから決まります（`src/timing.ts`）。自分の録音や VOICEVOX などに差し替えるときは、
+`public/narration/<id>.wav` を同じ名前で置き換えてから `python scripts/make-narration.py --measure-only` を実行すれば、
+長さだけ測り直して動画の尺が追従します。
+
 ## フォント
 
 Noto Sans JP（SIL Open Font License 1.1）を `public/fonts` に同梱しています。

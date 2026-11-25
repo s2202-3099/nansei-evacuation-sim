@@ -1,5 +1,6 @@
 import {Composition} from 'remotion';
-import {EvacuationVideo, TOTAL_LEN} from './EvacuationVideo';
+import {EvacuationVideo} from './EvacuationVideo';
+import {TOTAL_LEN} from './timing';
 
 export const RemotionRoot: React.FC = () => {
   return (

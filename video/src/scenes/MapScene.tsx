@@ -5,22 +5,15 @@ import {arc, cameraAt, H, project, W, type Camera} from '../geo';
 import {C, fmt, fontFamily, man} from '../theme';
 
 const S = SCN.kyushu;
-const DAYS = S.sakiDay ?? S.frames.length - 1;
-
-// ── タイミング（フレーム、30fps）
-export const INTRO = 270; // 地図の導入
-export const DAY_LEN = 72; // 1日あたり 2.4秒
-export const OUTRO = 180;
-export const MAP_SCENE_LEN = INTRO + DAYS * DAY_LEN + OUTRO;
-const dayStart = (d: number) => INTRO + (d - 1) * DAY_LEN;
+import {DAYS, INTRO, INTRO_A, MAP_SCENE_LEN, dayAt, dayLen, dayStart} from '../timing';
 
 // ── カメラ
 const WIDE: Camera = {lng: 126.0, lat: 29.3, span: 22.5};
 const SAKI: Camera = {lng: 124.6, lat: 24.45, span: 4.4};
 const CAM_KEYS: [number, Camera][] = [
   [0, WIDE],
-  [50, WIDE],
-  [150, SAKI],
+  [INTRO_A - 60, WIDE],
+  [INTRO_A + 40, SAKI],
   [dayStart(6) - 30, SAKI],
   [dayStart(6) + 50, WIDE],
 ];
@@ -30,12 +23,9 @@ const ease = Easing.bezier(0.33, 0, 0.2, 1);
 
 // その時点の値を、前日→当日の間で補間して返す
 const tween = (frame: number, pick: (d: number) => number) => {
-  if (frame < INTRO) return pick(0);
-  const t = (frame - INTRO) / DAY_LEN;
-  const d = Math.min(DAYS, Math.floor(t) + 1);
-  if (t >= DAYS) return pick(DAYS);
-  const p = ease(t - Math.floor(t));
-  return pick(d - 1) + (pick(d) - pick(d - 1)) * p;
+  const {d, p} = dayAt(frame);
+  if (d === 0) return pick(0);
+  return pick(d - 1) + (pick(d) - pick(d - 1)) * ease(p);
 };
 
 const KAGO_PORT = {lat: 31.58, lng: 130.56};
@@ -88,13 +78,14 @@ const Dots: React.FC<{frame: number; cam: Camera}> = ({frame, cam}) => {
   const dots: React.ReactNode[] = [];
   FLOWS.forEach((flows, idx) => {
     const ds = dayStart(idx + 1);
-    if (frame < ds || frame > ds + DAY_LEN + 120) return;
+    const len = dayLen(idx + 1);
+    if (frame < ds || frame > ds + len + 120) return;
     for (const f of flows) {
       const n = Math.min(36, Math.round(f.amount / PER_DOT));
       if (n <= 0) continue;
       const path = arc(project(cam, f.from.lng, f.from.lat), project(cam, f.to.lng, f.to.lat), f.bend);
       for (let k = 0; k < n; k++) {
-        const t = (frame - (ds + (k * DAY_LEN) / n)) / f.travel;
+        const t = (frame - (ds + (k * len) / n)) / f.travel;
         if (t < 0 || t > 1) continue;
         const p = path.at(ease(t));
         const o = interpolate(t, [0, 0.08, 0.85, 1], [0, 0.9, 0.9, 0]);
@@ -107,7 +98,7 @@ const Dots: React.FC<{frame: number; cam: Camera}> = ({frame, cam}) => {
 
 // 道筋の線。その日に動いている経路だけ濃く
 const Routes: React.FC<{frame: number; cam: Camera}> = ({frame, cam}) => {
-  const d = Math.min(DAYS, Math.max(1, Math.floor((frame - INTRO) / DAY_LEN) + 1));
+  const d = Math.max(1, dayAt(frame).d);
   if (frame < INTRO - 20) return null;
   const fadeIn = interpolate(frame, [INTRO - 20, INTRO + 10], [0, 1], clamp);
   const active = new Map(FLOWS[d - 1].filter((f) => f.amount > 1).map((f) => [f.key, f]));
@@ -156,7 +147,7 @@ const Islands: React.FC<{frame: number; cam: Camera}> = ({frame, cam}) => {
     <>
       {GEO.islands.map((i, idx) => {
         const p = project(cam, i.lng, i.lat);
-        const pop = interpolate(frame, [95 + idx * 4, 115 + idx * 4], [0, 1], {...clamp, easing: Easing.out(Easing.back(1.6))});
+        const pop = interpolate(frame, [INTRO_A - 15 + idx * 4, INTRO_A + 5 + idx * 4], [0, 1], {...clamp, easing: Easing.out(Easing.back(1.6))});
         if (i.type === 'bridge') {
           return <circle key={i.id} cx={p.x} cy={p.y} r={3.5 * k * pop} fill={C.island} opacity={0.6} />;
         }
@@ -219,8 +210,8 @@ const Places: React.FC<{frame: number; cam: Camera}> = ({frame, cam}) => {
 // ── 見出し（段階ごとに切り替え）
 type Phase = {from: number; to: number; head: string; sub: string};
 const PHASES: Phase[] = [
-  {from: 0, to: 140, head: '先島諸島　九州から約1,000km', sub: '宮古・八重山の18の有人島。与那国島から台湾までは約110km'},
-  {from: 140, to: INTRO, head: `住民${fmt(S.residents)}人＋観光客など${fmt(S.tourists)}人`,
+  {from: 0, to: INTRO_A, head: '先島諸島　九州から約1,000km', sub: '宮古・八重山の18の有人島。与那国島から台湾までは約110km'},
+  {from: INTRO_A, to: INTRO, head: `住民${fmt(S.residents)}人＋観光客など${fmt(S.tourists)}人`,
     sub: '空港のある石垣・宮古が拠点。ほかの島からは小型機・ヘリ・船で拠点へ'},
   {from: INTRO, to: dayStart(S.startDelay + 1), head: `1〜${S.startDelay}日目　定期便で自力退避`,
     sub: '公的輸送の準備が整うまで、観光客と一部の住民が定期便で島を出る'},
@@ -247,8 +238,7 @@ const Caption: React.FC<{frame: number}> = ({frame}) => {
 
 const Panel: React.FC<{frame: number}> = ({frame}) => {
   const o = interpolate(frame, [INTRO - 30, INTRO], [0, 1], clamp);
-  const t = (frame - INTRO) / DAY_LEN;
-  const day = frame < INTRO ? 0 : Math.min(DAYS, Math.floor(t) + 1);
+  const day = dayAt(frame).d;
   const inSaki = tween(frame, (d) => S.frames[d].inSaki);
   const arrived = tween(frame, (d) => S.frames[d].arrived);
   const pct = (arrived / S.target) * 100;
