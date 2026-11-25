@@ -18,6 +18,9 @@ export const ClosingScene: React.FC = () => {
       <div style={{fontSize: 30, marginTop: 50, opacity: interpolate(f, [60, 85], [0, 1], clamp), color: '#9FA6AC'}}>
         出所：内閣官房国家危機管理室「沖縄県の離島からの住民避難・受入れに係る取組」、住民基本台帳（令和7年1月1日）
       </div>
+      <div style={{fontSize: 30, marginTop: 16, opacity: interpolate(f, [60, 85], [0, 1], clamp), color: '#9FA6AC'}}>
+        ナレーション　VOICEVOX:ずんだもん
+      </div>
     </AbsoluteFill>
   );
 };

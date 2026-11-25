@@ -30,12 +30,16 @@ REMOTION_BROWSER=/path/to/chrome-headless-shell npx remotion render NanseiEvacua
 
 ## ナレーション
 
-原稿は `scripts/narration.json`。音声は Open JTalk（pyopenjtalk-plus）でオフライン生成しています。
+原稿は `scripts/narration.json`。音声は VOICEVOX のずんだもん（ノーマル）です。動画の結びに「VOICEVOX:ずんだもん」のクレジットを入れています（音声ライブラリの利用条件）。
 
 ```bash
-pip install pyopenjtalk-plus numpy
-python scripts/make-narration.py          # 原稿から public/narration/*.wav を作り、長さを測る
+# VOICEVOX エンジンを起動（アプリを起動しておくか、Docker で）
+docker run -d -p 50021:50021 voicevox/voicevox_engine:cpu-latest
+python scripts/make-narration-voicevox.py     # 原稿から public/narration/*.wav を作る（読みも表示）
+python scripts/make-narration.py --measure-only   # 長さを測って src/data/narration.json を更新
 ```
+
+VOICEVOX が使えない環境では、Open JTalk（`pip install pyopenjtalk-plus numpy` のあと `python scripts/make-narration.py`）でも作れます。
 
 各シーンの尺はナレーションの長さから決まります（`src/timing.ts`）。自分の録音や VOICEVOX などに差し替えるときは、
 `public/narration/<id>.wav` を同じ名前で置き換えてから `python scripts/make-narration.py --measure-only` を実行すれば、
