@@ -21,7 +21,7 @@ export const TitleScene: React.FC = () => {
         height: 8, background: C.island, marginTop: 40}} />
       <div style={{fontSize: 40, color: C.sub, marginTop: 36, lineHeight: 1.6,
         opacity: interpolate(f, [55, 80], [0, 1], clamp)}}>
-        受入先を九州・山口とした既定シナリオを、地図の上で1日ずつ追う
+        受入先を九州・山口の9空港に広げた場合を、地図の上で1日ずつ追う
       </div>
     </AbsoluteFill>
   );
